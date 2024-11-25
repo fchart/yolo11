@@ -36,8 +36,6 @@ SOURCES_LIST = ["圖片", "影片", "網路攝影機Webcam", "網路監控攝影
 
 # YOLO 物體偵測模型設置
 DETECTION_MODEL_DIR = ROOT / 'weights' / 'detection'
-# YOLO 姿態評估模型設置
-POSE_MODEL_DIR = ROOT / 'weights' / 'pos'
 
 DETECTION_MODEL_LIST = [
     "yolo11n.pt",
@@ -45,14 +43,6 @@ DETECTION_MODEL_LIST = [
     "yolo11m.pt",
     "yolo11l.pt",
     "yolo11x.pt",
-    "best.pt"]
-
-POSE_MODEL_LIST = [
-    "yolo11n-pose.pt",
-    "yolo11s-pose.pt",
-    "yolo11m-pose.pt",
-    "yolo11l-pose.pt",
-    "yolo11x-pose.pt",
     "best.pt"]
 
 def _display_detected_frames(conf, model, st_frame, image, task_type):
@@ -150,30 +140,7 @@ def infer_uploaded_image(conf, model, task_type):
                         except Exception as ex:
                             st.write("尚未有圖檔上傳!")
                             st.write(ex)
-                elif task_type == "姿態評估":
-                    res = model.predict(uploaded_image,
-                                        conf=conf)
-                    res_plotted = res[0].plot()[:, :, ::-1]
-                    with col2:
-                        st.image(res_plotted,
-                                 caption="偵測結果圖片",
-                                 use_container_width=True)
-                        try:
-                            with st.expander("偵測結果"):
-                                for r in res:
-                                    boxes = r.boxes
-                                    kps = r.keypoints
-                                    for idx, p in enumerate(kps):
-                                        list_p = p.data.tolist()
-                                        st.write("姿態評估偵測的17個關鍵點:", idx)
-                                        for i, point in enumerate(list_p[0]):
-                                            st.write(f"關鍵點: {i}: ({int(point[0])}, {int(point[1])})")
-                                        st.write("------------------------")    
-                                            
-                        except Exception as ex:
-                            st.write("尚未上傳圖檔!")
-                            st.write(ex)                    
-
+                           
 def infer_uploaded_video(conf, model, task_type):
     """
     執行上傳影片的推論
@@ -299,8 +266,7 @@ st.sidebar.header("YOLO模型設置")
 # 作業選項
 task_type = st.sidebar.selectbox(
     "選擇任務",
-    ["物體偵測",
-     "姿態評估"]
+    ["物體偵測"]
 )
 # 模型選項
 model_type = None
@@ -309,13 +275,8 @@ if task_type == "物體偵測":
         "選擇模型",
         DETECTION_MODEL_LIST
     )
-elif task_type == "姿態評估":
-    model_type = st.sidebar.selectbox(
-        "選擇模型",
-        POSE_MODEL_LIST
-    )
 else:
-    st.error("目前已經實作 '物體偵測' 和 '姿態評估' 功能")
+    st.error("目前已經實作 '物體偵測' 功能")
 # 信心指數選項
 confidence = float(st.sidebar.slider(
     "選擇信心指數", 30, 100, 50)) / 100
@@ -324,8 +285,6 @@ model_path = ""
 if model_type:
     if task_type == "物體偵測":
         model_path = Path(DETECTION_MODEL_DIR, str(model_type))
-    elif task_type == "姿態評估":
-        model_path = Path(POSE_MODEL_DIR, str(model_type))
 else:
     st.error("請在側邊欄選擇模型種類")
 
