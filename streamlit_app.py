@@ -113,7 +113,7 @@ def infer_uploaded_image(conf, model, task_type):
     if source_img:
         if st.button("執行"):
             with st.spinner("執行中..."):
-                if task_type == "物體偵測": 
+                 
                     res = model.predict(uploaded_image,
                                         conf=conf)                    
                     res_plotted = res[0].plot()[:, :, ::-1]
@@ -283,8 +283,7 @@ confidence = float(st.sidebar.slider(
 # 取得模型儲存的路徑
 model_path = ""
 if model_type:
-    if task_type == "物體偵測":
-        model_path = Path(DETECTION_MODEL_DIR, str(model_type))
+    model_path = Path(DETECTION_MODEL_DIR, str(model_type))
 else:
     st.error("請在側邊欄選擇模型種類")
 
