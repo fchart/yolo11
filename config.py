@@ -5,7 +5,7 @@
    @File Name:     config.py
    @Author:        Luyao.zhang
    @Date:          2023/5/16
-   @Update Date:   2024/11/25 修改和中文化 By 陳會安
+   @Update Date:   2024/11/22 修改和中文化 By 陳會安
    @Description: configuration file
 -------------------------------------------------
 """
@@ -26,29 +26,30 @@ if root_path not in sys.path:
 ROOT = root_path.relative_to(Path.cwd())
 
 # 資料來源
+#SOURCES_LIST = ["Image", "Video", "Webcam"]
 SOURCES_LIST = ["圖片", "影片", "網路攝影機Webcam", "網路監控攝影機IPcam"]
 
-# YOLO 物體偵測模型路徑設置
+# YOLO 物體偵測模型設置
 DETECTION_MODEL_DIR = ROOT / 'weights' / 'detection'
-# YOLO 圖片分割模型路徑設置
-SEGMENT_MODEL_DIR = ROOT / 'weights' / 'segment'
-# YOLO 姿態評估模型路徑設置
+YOLO11n = DETECTION_MODEL_DIR / "yolo11n.pt"
+YOLO11s = DETECTION_MODEL_DIR / "yolo11s.pt"
+YOLO11m = DETECTION_MODEL_DIR / "yolo11m.pt"
+YOLO11l = DETECTION_MODEL_DIR / "yolo11l.pt"
+YOLO11x = DETECTION_MODEL_DIR / "yolo11x.pt"
+# YOLO 姿態評估模型設置
 POSE_MODEL_DIR = ROOT / 'weights' / 'pos'
-# YOLO模型選項
+YOLO11n_pose = DETECTION_MODEL_DIR / "yolo11n-pose.pt"
+YOLO11s_pose = DETECTION_MODEL_DIR / "yolo11s-pose.pt"
+YOLO11m_pose = DETECTION_MODEL_DIR / "yolo11m-pose.pt"
+YOLO11l_pose = DETECTION_MODEL_DIR / "yolo11l-pose.pt"
+YOLO11x_pose = DETECTION_MODEL_DIR / "yolo11x-pose.pt"
+
 DETECTION_MODEL_LIST = [
     "yolo11n.pt",
     "yolo11s.pt",
     "yolo11m.pt",
     "yolo11l.pt",
     "yolo11x.pt",
-    "best.pt"]
-
-SEGMENT_MODEL_LIST = [
-    "yolo11n-seg.pt",
-    "yolo11s-seg.pt",
-    "yolo11m-seg.pt",
-    "yolo11l-seg.pt",
-    "yolo11x-seg.pt",
     "best.pt"]
 
 POSE_MODEL_LIST = [
