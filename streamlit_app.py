@@ -5,8 +5,9 @@
    @File Name:     app.py
    @Author:        Luyao.zhang
    @Date:          2023/5/15
-   @Update Date:   2024/11/22 修改和中文化 By 陳會安
-   @Description:
+   @Update Date:   2024/12/11 更新 By 陳會安
+   @Description:   修改簡化成單一Python程式檔和中文化
+                   新增用瀏覽器Webcam拍攝和改成IPcam
 -------------------------------------------------
 """
 from pathlib import Path
@@ -17,7 +18,17 @@ from ultralytics import YOLO
 import cv2
 from PIL import Image
 import tempfile
+import numpy as np
 
+# 設定 Streamlit 頁面佈局
+st.set_page_config(
+    page_title="Ultralytics YOLO11 模型任務的互動介面",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+    )
+
+# 建立Streamlit App路徑和介面選項串列
 # 取得目前檔案的絕對路徑
 file_path = Path(__file__).resolve()
 
@@ -32,10 +43,12 @@ if root_path not in sys.path:
 ROOT = root_path.relative_to(Path.cwd())
 
 # 資料來源
-SOURCES_LIST = ["圖片", "影片", "網路攝影機Webcam", "網路監控攝影機IPcam"]
+SOURCES_LIST = ["圖片", "影片", "用網路攝影機Webcam拍照", "網路監控攝影機IPcam"]
 
 # YOLO 物體偵測模型設置
 DETECTION_MODEL_DIR = ROOT / 'weights' / 'detection'
+# YOLO 姿態評估模型設置
+POSE_MODEL_DIR = ROOT / 'weights' / 'pos'
 
 DETECTION_MODEL_LIST = [
     "yolo11n.pt",
@@ -45,7 +58,17 @@ DETECTION_MODEL_LIST = [
     "yolo11x.pt",
     "best.pt"]
 
-def _display_detected_frames(conf, model, st_frame, image, task_type):
+POSE_MODEL_LIST = [
+    "yolo11n-pose.pt",
+    "yolo11s-pose.pt",
+    "yolo11m-pose.pt",
+    "yolo11l-pose.pt",
+    "yolo11x-pose.pt",
+    "best.pt"]
+
+# YOLO工具函數, 可以偵測, 載入模型, 支援Webcam和IPcam
+# 顯示影片, Webcam拍攝和IPcam影格的偵測結果
+def _display_detected_frames(conf, model, st_frame, image, task_type, channels="BGR", caption="偵測結果影片"):
     """
     使用 YOLO11 模型在影片幀上標記出偵測到的物體。
     :param conf (float): 物體偵測的信心指數閾值。
@@ -64,12 +87,12 @@ def _display_detected_frames(conf, model, st_frame, image, task_type):
     # Plot the detected objects on the video frame
     res_plotted = res[0].plot()
     st_frame.image(res_plotted,
-                   caption='偵測結果影片',
-                   channels="BGR",
+                   caption=caption,
+                   channels=channels,
                    use_container_width=True
                    )
 
-
+# 下載和載入YOLO模型
 @st.cache_resource
 def load_model(model_path):
     """
@@ -84,7 +107,7 @@ def load_model(model_path):
     model = YOLO(model_path)
     return model
 
-
+# 上傳圖片進行YOLO偵測
 def infer_uploaded_image(conf, model, task_type):
     """
     執行上傳圖片的推論
@@ -113,7 +136,7 @@ def infer_uploaded_image(conf, model, task_type):
     if source_img:
         if st.button("執行"):
             with st.spinner("執行中..."):
-                 
+                if task_type == "物體偵測": 
                     res = model.predict(uploaded_image,
                                         conf=conf)                    
                     res_plotted = res[0].plot()[:, :, ::-1]
@@ -140,7 +163,31 @@ def infer_uploaded_image(conf, model, task_type):
                         except Exception as ex:
                             st.write("尚未有圖檔上傳!")
                             st.write(ex)
-                           
+                elif task_type == "姿態評估":
+                    res = model.predict(uploaded_image,
+                                        conf=conf)
+                    res_plotted = res[0].plot()[:, :, ::-1]
+                    with col2:
+                        st.image(res_plotted,
+                                 caption="偵測結果圖片",
+                                 use_container_width=True)
+                        try:
+                            with st.expander("偵測結果"):
+                                for r in res:
+                                    boxes = r.boxes
+                                    kps = r.keypoints
+                                    for idx, p in enumerate(kps):
+                                        list_p = p.data.tolist()
+                                        st.write("姿態評估偵測的17個關鍵點:", idx)
+                                        for i, point in enumerate(list_p[0]):
+                                            st.write(f"關鍵點: {i}: ({int(point[0])}, {int(point[1])})")
+                                        st.write("------------------------")    
+                                            
+                        except Exception as ex:
+                            st.write("尚未上傳圖檔!")
+                            st.write(ex)
+                            
+# 上傳影片進行YOLO偵測
 def infer_uploaded_video(conf, model, task_type):
     """
     執行上傳影片的推論
@@ -180,20 +227,52 @@ def infer_uploaded_video(conf, model, task_type):
                 except Exception as e:
                     st.error(f"載入影片錯誤: {e}")
 
-
+# 用Webcam拍攝圖片進行YOLO偵測
 def infer_uploaded_webcam(conf, model, task_type):
     """
-    執行網路攝影機Webcam的推論
+    在瀏覽器使用網路攝影機Webcam拍攝後進行推論
     :param conf (float): 物體偵測的信心指數閾值。
     :param model (YOLO11): YOLO11 模型的實例。
     :param task_type (string): YOLO 任務類型。
     :return: 無返回值。
     """
     try:
+        # 使用 st.camera_input 捕捉影像
+        img = st.camera_input("請在瀏覽器使用網路攝影機 WebCam 拍攝影像來進行偵測...")
+        st_frame = st.empty()
+        if img:
+            # 讀取影像
+            img = Image.open(img)
+            img = np.array(img)
+            _display_detected_frames(
+                    conf,
+                    model,
+                    st_frame,
+                    img,
+                    task_type,
+                    channels="BRG",
+                    caption="偵測拍攝結果的圖片"
+                )
+
+    except Exception as e:
+        st.error(f"載入網路攝影機Webcam錯誤: {str(e)}")
+        
+# 用IPcam進行YOLO即時影格偵測        
+def infer_uploaded_IPcam(conf, model, url, task_type):
+    """
+    執行網路監控攝影機IP Camera的推論
+    :param conf (float): 物體偵測的信心指數閾值。
+    :param model (YOLO11): YOLO11 模型的實例。
+    :param task_type (string): YOLO 任務類型。
+    :return: 無返回值。
+    """
+    
+    st.write(f"您輸入的URL是: {url}")
+    try:
         flag = st.button(
             label="停止執行"
         )
-        vid_cap = cv2.VideoCapture(0)  # local camera
+        vid_cap = cv2.VideoCapture(url)  # IP camera
         st_frame = st.empty()
         while not flag:
             success, image = vid_cap.read()
@@ -209,54 +288,9 @@ def infer_uploaded_webcam(conf, model, task_type):
                 vid_cap.release()
                 break
     except Exception as e:
-        st.error(f"載入網路攝影機錯誤: {str(e)}")
-        
-def infer_uploaded_IPcam(conf, model, task_type):
-    """
-    執行網路監控攝影機IP Camera的推論
-    :param conf (float): 物體偵測的信心指數閾值。
-    :param model (YOLO11): YOLO11 模型的實例。
-    :param task_type (string): YOLO 任務類型。
-    :return: 無返回值。
-    """
-    # tw live可搜尋台灣即時影像：https://trafficvideo2.tainan.gov.tw/b596d902
-    # 在側邊欄中輸入 URL
-    url = st.sidebar.text_input("輸入URL")
-    if url:
-        st.write(f"您輸入的URL是: {url}")
-        try:
-            flag = st.button(
-                label="停止執行"
-            )
-            vid_cap = cv2.VideoCapture(url)  # IP camera
-            st_frame = st.empty()
-            while not flag:
-                success, image = vid_cap.read()
-                if success:
-                    _display_detected_frames(
-                        conf,
-                        model,
-                        st_frame,
-                        image,
-                        task_type
-                    )
-                else:
-                    vid_cap.release()
-                    break
-        except Exception as e:
-            st.error(f"載入網路攝影機錯誤: {str(e)}")        
-    else:
-        st.error(f"請在側邊欄[輸入URL]欄位輸入網路監控攝影機IP Camera的URL網址後, 按Enter鍵")
+        st.error(f"載入網路監控攝影機IP Camera錯誤: {str(e)}")        
 
-
-# 設定頁面佈局
-st.set_page_config(
-    page_title="Ultralytics YOLO11 模型任務的互動介面",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-    )
-
+# 建立Ultralytics YOLO11 模型任務的互動介面
 # 主頁面標題
 st.title("Ultralytics YOLO11 模型任務的互動介面")
 
@@ -266,7 +300,8 @@ st.sidebar.header("YOLO模型設置")
 # 作業選項
 task_type = st.sidebar.selectbox(
     "選擇任務",
-    ["物體偵測"]
+    ["物體偵測",
+     "姿態評估"]
 )
 # 模型選項
 model_type = None
@@ -275,15 +310,23 @@ if task_type == "物體偵測":
         "選擇模型",
         DETECTION_MODEL_LIST
     )
+elif task_type == "姿態評估":
+    model_type = st.sidebar.selectbox(
+        "選擇模型",
+        POSE_MODEL_LIST
+    )
 else:
-    st.error("目前已經實作 '物體偵測' 功能")
+    st.error("目前已經實作 '物體偵測' 和 '姿態評估' 功能")
 # 信心指數選項
 confidence = float(st.sidebar.slider(
     "選擇信心指數", 30, 100, 50)) / 100
 # 取得模型儲存的路徑
 model_path = ""
 if model_type:
-    model_path = Path(DETECTION_MODEL_DIR, str(model_type))
+    if task_type == "物體偵測":
+        model_path = Path(DETECTION_MODEL_DIR, str(model_type))
+    elif task_type == "姿態評估":
+        model_path = Path(POSE_MODEL_DIR, str(model_type))
 else:
     st.error("請在側邊欄選擇模型種類")
 
@@ -299,7 +342,6 @@ source_selectbox = st.sidebar.selectbox(
     "選擇來源",
     SOURCES_LIST
 )
-
 source_img = None
 if source_selectbox == SOURCES_LIST[0]:   # Image
     infer_uploaded_image(confidence, model, task_type)
@@ -308,6 +350,18 @@ elif source_selectbox == SOURCES_LIST[1]: # Video
 elif source_selectbox == SOURCES_LIST[2]: # Webcam
     infer_uploaded_webcam(confidence, model, task_type)
 elif source_selectbox == SOURCES_LIST[3]: # IPcam
-    infer_uploaded_IPcam(confidence, model, task_type)    
+    # tw live可搜尋台灣即時影像：https://trafficvideo2.tainan.gov.tw/b596d902
+    # 在側邊欄中輸入 URL
+    text_input_key = "ipcam_url"
+    url = st.sidebar.text_input("輸入URL", key=text_input_key)
+    # 使用 HTML 和 JavaScript 來設置焦點
+    st.sidebar.html("""
+    <script>
+        document.querySelector('input[type="text"]').focus();
+    </script>""")
+    if url:
+        infer_uploaded_IPcam(confidence, model, url, task_type)
+    else:
+        st.error(f"請在側邊欄[輸入URL]欄位輸入網路監控攝影機IP Camera的URL網址後, 按Enter鍵")        
 else:
-    st.error("目前資料來源支援'圖片' ,'影片' ,'網路攝影機' 和 '網路監控攝影機'")
+    st.error("目前資料來源支援'圖片' ,'影片' ,'網路攝影機拍照' 和 '網路監控攝影機'")
