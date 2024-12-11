@@ -303,6 +303,10 @@ task_type = st.sidebar.selectbox(
     ["物體偵測",
      "姿態評估"]
 )
+# 顯示次標題
+st.subheader(task_type)
+# 新增一條水平線
+st.markdown("---")
 # 模型選項
 model_type = None
 if task_type == "物體偵測":
